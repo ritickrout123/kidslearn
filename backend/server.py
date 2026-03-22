@@ -304,6 +304,35 @@ async def get_child(child_id: str, request: Request):
     
     return child_doc
 
+
+@api_router.patch("/child/{child_id}")
+async def update_child(child_id: str, request: Request):
+    """Update child profile (language, etc.)"""
+    user_id = await get_current_user(request)
+    body = await request.json()
+    
+    # Verify child belongs to user
+    child_doc = await db.children.find_one(
+        {"child_id": child_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    
+    if not child_doc:
+        raise HTTPException(status_code=404, detail="Child not found")
+    
+    # Update allowed fields
+    update_fields = {}
+    if "language" in body:
+        update_fields["language"] = body["language"]
+    
+    if update_fields:
+        await db.children.update_one(
+            {"child_id": child_id},
+            {"$set": update_fields}
+        )
+    
+    return {"message": "Child updated successfully"}
+
 # ============= SESSION ROUTES =============
 
 @api_router.post("/session/start")
