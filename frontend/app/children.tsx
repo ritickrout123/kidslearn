@@ -20,12 +20,20 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 const AVATARS = ['🦁', '🐯', '🐻', '🐼', '🐨', '🐸', '🦊', '🐰', '🐵', '🦄'];
 
+const CARD_COLORS = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#6BCB77', '#9B59B6', '#E67E22'];
+
 interface Child {
   child_id: string;
   name: string;
   age: number;
   avatar: string;
   total_stars: number;
+  streak?: {
+    current: number;
+    longest: number;
+    last_date: string;
+  };
+  badges?: string[];
 }
 
 export default function ChildrenScreen() {
@@ -91,6 +99,10 @@ export default function ChildrenScreen() {
     router.push('/subjects');
   };
 
+  const goToDashboard = () => {
+    router.push('/dashboard');
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -101,52 +113,115 @@ export default function ChildrenScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.name}! 👋</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]}! 👋</Text>
           <Text style={styles.subtitle}>Who's learning today?</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={goToDashboard} style={styles.dashboardButton}>
+            <Ionicons name="bar-chart" size={24} color="#FF6B6B" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content}>
         {children.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No child profiles yet</Text>
-            <Text style={styles.emptySubtext}>Add your first child to get started!</Text>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="trophy" size={80} color="#FFD93D" />
+            </View>
+            <Text style={styles.emptyText}>No learners yet</Text>
+            <Text style={styles.emptySubtext}>Start building your trophy room!</Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => setShowModal(true)}
+            >
+              <Ionicons name="add-circle" size={24} color="#fff" />
+              <Text style={styles.emptyButtonText}>Add your first learner!</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.childrenGrid}>
-            {children.map((child) => (
-              <TouchableOpacity
-                key={child.child_id}
-                style={styles.childCard}
-                onPress={() => selectChild(child.child_id)}
-              >
-                <Text style={styles.childAvatar}>{child.avatar}</Text>
-                <Text style={styles.childName}>{child.name}</Text>
-                <Text style={styles.childAge}>{child.age} years old</Text>
-                <View style={styles.starsContainer}>
-                  <Ionicons name="star" size={16} color="#FFD93D" />
-                  <Text style={styles.starsText}>{child.total_stars}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.cardsContainer}>
+            {children.map((child, index) => {
+              const borderColor = CARD_COLORS[index % CARD_COLORS.length];
+              const lastBadge = child.badges && child.badges.length > 0 
+                ? child.badges[child.badges.length - 1] 
+                : null;
+
+              return (
+                <TouchableOpacity
+                  key={child.child_id}
+                  style={[styles.trophyCard, { borderLeftColor: borderColor }]}
+                  onPress={() => selectChild(child.child_id)}
+                  activeOpacity={0.7}
+                >
+                  {/* Left: Avatar */}
+                  <View style={styles.cardLeft}>
+                    <Text style={styles.cardAvatar}>{child.avatar}</Text>
+                  </View>
+
+                  {/* Right: Info */}
+                  <View style={styles.cardRight}>
+                    <Text style={styles.cardName}>{child.name}</Text>
+                    
+                    <View style={styles.statsRow}>
+                      {/* Streak */}
+                      <View style={styles.statBadge}>
+                        <Text style={styles.fireEmoji}>🔥</Text>
+                        <Text style={styles.streakNumber}>
+                          {child.streak?.current || 0}
+                        </Text>
+                        <Text style={styles.statLabel}>day streak</Text>
+                      </View>
+
+                      {/* Stars */}
+                      <View style={styles.statBadge}>
+                        <Ionicons name="star" size={20} color="#FFD93D" />
+                        <Text style={styles.starsNumber}>{child.total_stars}</Text>
+                        <Text style={styles.statLabel}>stars</Text>
+                      </View>
+                    </View>
+
+                    {/* Last Badge */}
+                    {lastBadge && (
+                      <View style={styles.badgeContainer}>
+                        <Ionicons name="ribbon" size={16} color="#9B59B6" />
+                        <Text style={styles.badgeText}>Latest: {lastBadge}</Text>
+                      </View>
+                    )}
+
+                    {/* Continue Journey Button */}
+                    <TouchableOpacity
+                      style={[styles.continueButton, { backgroundColor: borderColor }]}
+                      onPress={() => selectChild(child.child_id)}
+                    >
+                      <Text style={styles.continueButtonText}>Continue Journey</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setShowModal(true)}
-      >
-        <Ionicons name="add" size={32} color="#fff" />
-        <Text style={styles.addButtonText}>Add Child</Text>
-      </TouchableOpacity>
+      {/* Add Child Floating Button */}
+      {children.length > 0 && (
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowModal(true)}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
 
+      {/* Add Child Modal */}
       <Modal
         visible={showModal}
         animationType="slide"
@@ -155,7 +230,7 @@ export default function ChildrenScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Child</Text>
+            <Text style={styles.modalTitle}>Add New Learner</Text>
 
             <Text style={styles.label}>Name</Text>
             <TextInput
@@ -235,11 +310,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
-    paddingTop: 16,
+    padding: 20,
+    paddingTop: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerLeft: {
+    flex: 1,
   },
   greeting: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -247,6 +328,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dashboardButton: {
+    padding: 8,
+    backgroundColor: '#FFF5E1',
+    borderRadius: 8,
   },
   logoutButton: {
     padding: 8,
@@ -257,75 +348,151 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    marginTop: 80,
+    marginTop: 100,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    marginBottom: 24,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 32,
+    textAlign: 'center',
   },
-  childrenGrid: {
+  emptyButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  childCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
     alignItems: 'center',
-    width: '47%',
-    elevation: 2,
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 8,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  childAvatar: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  childName: {
+  emptyButtonText: {
+    color: '#fff',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  cardsContainer: {
+    gap: 16,
+  },
+  trophyCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderLeftWidth: 6,
+    padding: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  cardLeft: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  cardAvatar: {
+    fontSize: 72,
+  },
+  cardRight: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  cardName: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  childAge: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+  statsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 12,
   },
-  starsContainer: {
+  statBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: '#F8F8F8',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
   },
-  starsText: {
-    fontSize: 14,
-    fontWeight: '600',
+  fireEmoji: {
+    fontSize: 18,
+  },
+  streakNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FF6B6B',
+  },
+  starsNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#FFD93D',
   },
-  addButton: {
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E5F5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  badgeText: {
+    fontSize: 13,
+    color: '#9B59B6',
+    fontWeight: '600',
+  },
+  continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF6B6B',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
-  addButtonText: {
+  continueButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    backgroundColor: '#FF6B6B',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
   modalOverlay: {
     flex: 1,
