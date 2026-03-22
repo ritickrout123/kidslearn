@@ -48,25 +48,33 @@ class Child(BaseModel):
     name: str
     age: int
     avatar: str
+    language: str = "en"  # "en", "hi", "pa"
     total_stars: int = 0
     current_streak: int = 0
+    subjects_unlocked: List[str] = Field(default_factory=lambda: ["math"])
     subjects_progress: dict = Field(default_factory=dict)
+    streak: dict = Field(default_factory=lambda: {"current": 0, "longest": 0, "last_date": ""})
+    badges: List[str] = Field(default_factory=list)
+    daily_goal_minutes: int = 15
     created_at: datetime
 
 class ChildCreate(BaseModel):
     name: str
     age: int
     avatar: str
+    language: str = "en"
 
 class SessionData(BaseModel):
     session_id: str
     child_id: str
     subject: str
+    language: str = "en"
     difficulty: int
     questions_attempted: int = 0
     correct_answers: int = 0
     consecutive_correct: int = 0
     consecutive_wrong: int = 0
+    voice_used: bool = False
     start_time: datetime
     end_time: Optional[datetime] = None
     stars_earned: int = 0
@@ -74,6 +82,7 @@ class SessionData(BaseModel):
 class QuestionRequest(BaseModel):
     child_id: str
     subject: str
+    language: str = "en"
     difficulty: int
 
 class AnswerSubmit(BaseModel):
@@ -240,17 +249,27 @@ async def create_child(child_data: ChildCreate, request: Request):
     
     child_id = f"child_{uuid.uuid4().hex[:12]}"
     
+    # Initialize all subjects with age-appropriate starting difficulty
+    starting_level = max(1, min(3, (child_data.age - 3) // 2))
+    
     child_doc = {
         "child_id": child_id,
         "user_id": user_id,
         "name": child_data.name,
         "age": child_data.age,
         "avatar": child_data.avatar,
+        "language": child_data.language,
         "total_stars": 0,
         "current_streak": 0,
+        "subjects_unlocked": ["math", "phonics", "gk"],  # All subjects unlocked by default
         "subjects_progress": {
-            "math": {"level": max(1, min(3, (child_data.age - 3) // 2)), "questions_answered": 0, "accuracy": 0}
+            "math": {"level": starting_level, "questions_answered": 0, "accuracy": 0},
+            "phonics": {"level": starting_level, "questions_answered": 0, "accuracy": 0},
+            "gk": {"level": starting_level, "questions_answered": 0, "accuracy": 0}
         },
+        "streak": {"current": 0, "longest": 0, "last_date": ""},
+        "badges": [],
+        "daily_goal_minutes": 15,
         "created_at": datetime.now(timezone.utc)
     }
     
@@ -303,6 +322,7 @@ async def start_session(child_id: str, subject: str, request: Request):
     
     # Get starting difficulty from child's progress
     difficulty = child_doc.get("subjects_progress", {}).get(subject, {}).get("level", 1)
+    language = child_doc.get("language", "en")
     
     session_id = f"session_{uuid.uuid4().hex[:12]}"
     
@@ -310,11 +330,13 @@ async def start_session(child_id: str, subject: str, request: Request):
         "session_id": session_id,
         "child_id": child_id,
         "subject": subject,
+        "language": language,
         "difficulty": difficulty,
         "questions_attempted": 0,
         "correct_answers": 0,
         "consecutive_correct": 0,
         "consecutive_wrong": 0,
+        "voice_used": False,
         "start_time": datetime.now(timezone.utc),
         "end_time": None,
         "stars_earned": 0
@@ -322,7 +344,7 @@ async def start_session(child_id: str, subject: str, request: Request):
     
     await db.sessions.insert_one(session_doc)
     
-    return {"session_id": session_id, "difficulty": difficulty}
+    return {"session_id": session_id, "difficulty": difficulty, "language": language}
 
 @api_router.post("/session/end")
 async def end_session(session_id: str, request: Request):
@@ -364,7 +386,7 @@ async def end_session(session_id: str, request: Request):
 
 @api_router.post("/question/generate")
 async def generate_question(req: QuestionRequest, request: Request):
-    """Generate adaptive math question using Claude Sonnet"""
+    """Generate adaptive question using Claude Sonnet (multilingual, multi-subject)"""
     user_id = await get_current_user(request)
     
     # Verify child belongs to user
@@ -386,28 +408,61 @@ async def generate_question(req: QuestionRequest, request: Request):
     if not session_doc:
         raise HTTPException(status_code=400, detail="No active session")
     
-    # Generate question using Claude Sonnet
-    prompt = f"""Generate a math question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
-
-Return ONLY a JSON object with this exact format:
-{{
-    "question": "What is 5 + 3?",
-    "options": ["6", "7", "8", "9"],
-    "correct_answer": "8"
-}}
+    # Language names for prompts
+    lang_names = {"en": "English", "hi": "Hindi (हिंदी)", "pa": "Punjabi (ਪੰਜਾਬੀ)"}
+    language_name = lang_names.get(req.language, "English")
+    
+    # Subject-specific prompts
+    subject_prompts = {
+        "math": f"""Generate a math question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
 
 Difficulty {req.difficulty} guidelines:
 - Level 1: Single-digit addition/subtraction (e.g., 3+2, 7-4)
 - Level 2: Double-digit addition/subtraction, simple multiplication (e.g., 12+8, 3×4)
 - Level 3: Mixed operations, division, word problems (e.g., 15÷3, "If you have 10 apples and give away 3...")
 
-Return ONLY the JSON object, no other text."""
+Generate the question in {language_name}.""",
+        
+        "phonics": f"""Generate a phonics/reading question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
+
+Difficulty {req.difficulty} guidelines:
+- Level 1: Letter sounds, beginning sounds (e.g., "Which letter makes the 'buh' sound?")
+- Level 2: Rhyming words, simple word recognition (e.g., "Which word rhymes with 'cat'?")
+- Level 3: Sight words, simple sentences (e.g., "What is the missing word: 'The dog ___ running'?")
+
+Generate the question in {language_name}.""",
+        
+        "gk": f"""Generate a general knowledge question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
+
+Difficulty {req.difficulty} guidelines:
+- Level 1: Colors, shapes, common animals (e.g., "What color is the sky?", "What shape is a ball?")
+- Level 2: Body parts, days of week, seasons (e.g., "How many legs does a dog have?")
+- Level 3: World facts, science basics (e.g., "What do plants need to grow?", "What is the sun?")
+
+Generate the question in {language_name}."""
+    }
+    
+    base_prompt = subject_prompts.get(req.subject, subject_prompts["math"])
+    
+    prompt = f"""{base_prompt}
+
+Return ONLY a JSON object with this exact format:
+{{
+    "question": "Your question here",
+    "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+    "correct_answer": "Option X"
+}}
+
+IMPORTANT: 
+- All text (question and options) MUST be in {language_name}
+- Return ONLY the JSON object, no other text
+- Ensure questions are age-appropriate and culturally relevant"""
     
     try:
         chat = LlmChat(
             api_key=os.environ['EMERGENT_LLM_KEY'],
             session_id=session_doc["session_id"],
-            system_message="You are a math teacher for young children. Generate age-appropriate questions."
+            system_message=f"You are an experienced teacher for young children aged 4-10. Generate age-appropriate questions in {language_name}."
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
         
         message = UserMessage(text=prompt)
@@ -434,6 +489,8 @@ Return ONLY the JSON object, no other text."""
         question_doc = {
             "question_id": question_id,
             "session_id": session_doc["session_id"],
+            "subject": req.subject,
+            "language": req.language,
             "question_text": question_data["question"],
             "options": question_data["options"],
             "correct_answer": question_data["correct_answer"],
@@ -450,7 +507,9 @@ Return ONLY the JSON object, no other text."""
             "question_id": question_id,
             "question_text": question_data["question"],
             "options": question_data["options"],
-            "difficulty": req.difficulty
+            "difficulty": req.difficulty,
+            "subject": req.subject,
+            "language": req.language
         }
     
     except Exception as e:
