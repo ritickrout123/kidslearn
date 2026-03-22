@@ -6,36 +6,44 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const SUBJECTS = [
-  {
+const ZONES = {
+  math: {
     id: 'math',
-    icon: 'calculator',
-    color: '#FF6B6B',
-    gradient: ['#FF6B6B', '#FF8E53'],
+    title: 'Number Kingdom',
+    subtitle: 'Conquer math challenges',
+    bg: '#FF6B6B',
+    emoji: '🚀',
+    locked: false,
   },
-  {
+  phonics: {
     id: 'phonics',
-    icon: 'book',
-    color: '#4ECDC4',
-    gradient: ['#4ECDC4', '#44A08D'],
+    title: 'Word Jungle',
+    subtitle: 'Master letters and sounds',
+    bg: '#4ECDC4',
+    emoji: '🦜',
+    locked: false,
   },
-  {
+  gk: {
     id: 'gk',
-    icon: 'earth',
-    color: '#6BCB77',
-    gradient: ['#6BCB77', '#4D96A9'],
+    title: 'World Explorer',
+    subtitle: 'Discover amazing facts',
+    bg: '#6BCB77',
+    emoji: '🌍',
+    locked: false,
   },
-];
+};
 
 export default function SubjectsScreen() {
   const { t, i18n } = useTranslation();
@@ -61,7 +69,6 @@ export default function SubjectsScreen() {
       });
 
       setChild(response.data);
-      // Set app language to child's preferred language
       i18n.changeLanguage(response.data.language || 'en');
     } catch (error) {
       console.error('Failed to load child:', error);
@@ -86,7 +93,6 @@ export default function SubjectsScreen() {
       const childId = await AsyncStorage.getItem('current_child_id');
       const sessionToken = await AsyncStorage.getItem('session_token');
 
-      // Update child's language in backend
       await axios.patch(
         `${BACKEND_URL}/api/child/${childId}`,
         { language: lang },
@@ -101,49 +107,34 @@ export default function SubjectsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-      </View>
+      <LinearGradient colors={['#0F0C29', '#302B63']} style={styles.container}>
+        <ActivityIndicator size="large" color="#fff" />
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <LinearGradient colors={['#0F0C29', '#302B63', '#24243E']} style={styles.container}>
+      {/* Language Selector Bar */}
+      <View style={styles.languageBar}>
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.childName}>
-            {child?.avatar} {child?.name}
-          </Text>
-          <View style={styles.streakContainer}>
-            <Ionicons name="flame" size={16} color="#FF6B6B" />
-            <Text style={styles.streakText}>
-              {child?.streak?.current || 0} {t('dashboard.streak')}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.placeholder} />
-      </View>
 
-      {/* Language Selector */}
-      <View style={styles.languageSelector}>
-        <Text style={styles.languageLabel}>{t('language')}:</Text>
         <View style={styles.languageButtons}>
           {['en', 'hi', 'pa'].map((lang) => (
             <TouchableOpacity
               key={lang}
               style={[
-                styles.langButton,
-                child?.language === lang && styles.langButtonActive,
+                styles.langPill,
+                child?.language === lang && styles.langPillActive,
               ]}
               onPress={() => changeLanguage(lang)}
             >
               <Text
                 style={[
-                  styles.langButtonText,
-                  child?.language === lang && styles.langButtonTextActive,
+                  styles.langPillText,
+                  child?.language === lang && styles.langPillTextActive,
                 ]}
               >
                 {lang === 'en' ? 'EN' : lang === 'hi' ? 'हि' : 'ਪੰ'}
@@ -153,226 +144,263 @@ export default function SubjectsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        <Text style={styles.title}>{t('chooseSubject')}</Text>
+      {/* Hero Header */}
+      <View style={styles.hero}>
+        <Text style={styles.heroAvatar}>{child?.avatar}</Text>
+        <View style={styles.heroInfo}>
+          <View style={styles.heroNameRow}>
+            <Text style={styles.heroName}>{child?.name}</Text>
+            {child?.streak?.current > 0 && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakEmoji}>🔥</Text>
+                <Text style={styles.streakNumber}>{child.streak.current}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.heroSubtitle}>Choose your adventure</Text>
+        </View>
+      </View>
 
-        <View style={styles.subjectsContainer}>
-          {SUBJECTS.map((subject) => {
-            const progress = child?.subjects_progress?.[subject.id] || {};
-            return (
-              <TouchableOpacity
-                key={subject.id}
-                style={[styles.subjectCard, { borderColor: subject.color }]}
-                onPress={() => selectSubject(subject.id)}
-              >
-                <View
-                  style={[
-                    styles.subjectIconContainer,
-                    { backgroundColor: subject.color },
-                  ]}
-                >
-                  <Ionicons name={subject.icon as any} size={48} color="#fff" />
-                </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {Object.values(ZONES).map((zone, index) => {
+          const progress = child?.subjects_progress?.[zone.id] || {};
+          const rotation = index % 2 === 0 ? -1 : 1;
 
-                <Text style={styles.subjectName}>{t(subject.id)}</Text>
-                <Text style={styles.subjectDesc}>
-                  {t(`${subject.id}Desc`)}
-                </Text>
+          return (
+            <TouchableOpacity
+              key={zone.id}
+              style={[
+                styles.zoneCard,
+                { backgroundColor: zone.bg },
+                { transform: [{ rotate: `${rotation}deg` }] },
+              ]}
+              onPress={() => selectSubject(zone.id)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.zoneLeft}>
+                <Text style={styles.zoneEmoji}>{zone.emoji}</Text>
+              </View>
 
-                <View style={styles.progressInfo}>
-                  <View style={styles.levelBadge}>
-                    <Text style={styles.levelText}>
-                      {t('level')} {progress.level || 1}
+              <View style={styles.zoneRight}>
+                <Text style={styles.zoneTitle}>{zone.title}</Text>
+                <Text style={styles.zoneSubtitle}>{zone.subtitle}</Text>
+
+                <View style={styles.zoneBadges}>
+                  <View style={styles.zoneBadge}>
+                    <Text style={styles.zoneBadgeText}>
+                      Level {progress.level || 1}
                     </Text>
                   </View>
-                  <View style={styles.accuracyBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#6BCB77" />
-                    <Text style={styles.accuracyText}>
+                  <View style={styles.zoneBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                    <Text style={styles.zoneBadgeText}>
                       {progress.accuracy || 0}%
                     </Text>
                   </View>
                 </View>
 
-                <TouchableOpacity style={styles.startButton}>
-                  <Text style={styles.startButtonText}>{t('startLearning')}</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                <TouchableOpacity
+                  style={styles.playButton}
+                  onPress={() => selectSubject(zone.id)}
+                >
+                  <Text style={[styles.playButtonText, { color: zone.bg }]}>
+                    PLAY
+                  </Text>
+                  <Ionicons name="arrow-forward" size={18} color={zone.bg} />
                 </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Stars Display */}
+      <View style={styles.footer}>
+        <View style={styles.starsDisplay}>
+          <Ionicons name="star" size={28} color="#FFD93D" />
+          <Text style={styles.starsCount}>{child?.total_stars || 0}</Text>
+          <Text style={styles.starsLabel}>Total Stars</Text>
+        </View>
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF5E1',
   },
-  header: {
+  languageBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 16,
   },
   backButton: {
     padding: 8,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  childName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  streakText: {
-    fontSize: 14,
-    color: '#FF6B6B',
-    fontWeight: '600',
-  },
-  placeholder: {
-    width: 40,
-  },
-  languageSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    gap: 12,
-  },
-  languageLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
   },
   languageButtons: {
     flexDirection: 'row',
     gap: 8,
   },
-  langButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 2,
-    borderColor: '#E5E5E5',
+  langPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  langButtonActive: {
-    backgroundColor: '#4ECDC4',
-    borderColor: '#4ECDC4',
+  langPillActive: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#fff',
   },
-  langButtonText: {
-    fontSize: 14,
+  langPillText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: 'rgba(255,255,255,0.7)',
   },
-  langButtonTextActive: {
+  langPillTextActive: {
     color: '#fff',
+  },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  heroAvatar: {
+    fontSize: 56,
+    marginRight: 16,
+  },
+  heroInfo: {
+    flex: 1,
+  },
+  heroNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+  },
+  heroName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,107,107,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.3)',
+    gap: 4,
+  },
+  streakEmoji: {
+    fontSize: 16,
+  },
+  streakNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF6B6B',
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+  zoneCard: {
+    flexDirection: 'row',
+    borderRadius: 24,
+    padding: 20,
     marginBottom: 20,
-    textAlign: 'center',
-  },
-  subjectsContainer: {
-    gap: 16,
-  },
-  subjectCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 3,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 4,
   },
-  subjectIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  zoneLeft: {
     justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 16,
+    marginRight: 16,
   },
-  subjectName: {
-    fontSize: 24,
+  zoneEmoji: {
+    fontSize: 64,
+  },
+  zoneRight: {
+    flex: 1,
+  },
+  zoneTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
+    color: '#fff',
+    marginBottom: 4,
   },
-  subjectDesc: {
+  zoneSubtitle: {
     fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 12,
   },
-  progressInfo: {
+  zoneBadges: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: 8,
+    marginBottom: 12,
   },
-  levelBadge: {
-    backgroundColor: '#FFD93D',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  levelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  accuracyBadge: {
+  zoneBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F8F7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
     gap: 4,
   },
-  accuracyText: {
+  zoneBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6BCB77',
+    color: '#fff',
   },
-  startButton: {
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 14,
+    backgroundColor: '#fff',
+    paddingVertical: 10,
     borderRadius: 12,
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 20,
+  },
+  playButtonText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  footer: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  starsDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  starsCount: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#fff',
+  },
+  starsLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
   },
 });
