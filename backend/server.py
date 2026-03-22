@@ -412,6 +412,15 @@ async def generate_question(req: QuestionRequest, request: Request):
     lang_names = {"en": "English", "hi": "Hindi (हिंदी)", "pa": "Punjabi (ਪੰਜਾਬੀ)"}
     language_name = lang_names.get(req.language, "English")
     
+    # Language-specific numeral instructions
+    numeral_instructions = {
+        "en": "Use standard Arabic numerals (0-9).",
+        "hi": "CRITICAL: Use Devanagari numerals (०, १, २, ३, ४, ५, ६, ७, ८, ९) for ALL numbers. Example: '५ + ३ = ?' not '5 + 3 = ?'",
+        "pa": "CRITICAL: Use Gurmukhi numerals (੦, ੧, ੨, ੩, ੪, ੫, ੬, ੭, ੮, ੯) for ALL numbers. Example: '੫ + ੩ = ?' not '5 + 3 = ?'"
+    }
+    
+    numeral_instruction = numeral_instructions.get(req.language, numeral_instructions["en"])
+    
     # Subject-specific prompts
     subject_prompts = {
         "math": f"""Generate a math question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
@@ -421,7 +430,10 @@ Difficulty {req.difficulty} guidelines:
 - Level 2: Double-digit addition/subtraction, simple multiplication (e.g., 12+8, 3×4)
 - Level 3: Mixed operations, division, word problems (e.g., 15÷3, "If you have 10 apples and give away 3...")
 
-Generate the question in {language_name}.""",
+Language: {language_name}
+{numeral_instruction}
+
+Generate the question in {language_name} with appropriate numerals.""",
         
         "phonics": f"""Generate a phonics/reading question for a {child_doc['age']}-year-old child at difficulty level {req.difficulty} (1=easy, 2=medium, 3=hard).
 
@@ -444,6 +456,10 @@ Generate the question in {language_name}."""
     
     base_prompt = subject_prompts.get(req.subject, subject_prompts["math"])
     
+    # Add uniqueness instruction to prevent duplicate questions
+    import time
+    unique_seed = f"{session_doc['session_id']}_{int(time.time())}"
+    
     prompt = f"""{base_prompt}
 
 Return ONLY a JSON object with this exact format:
@@ -456,7 +472,9 @@ Return ONLY a JSON object with this exact format:
 IMPORTANT: 
 - All text (question and options) MUST be in {language_name}
 - Return ONLY the JSON object, no other text
-- Ensure questions are age-appropriate and culturally relevant"""
+- Ensure questions are age-appropriate and culturally relevant
+- Generate a UNIQUE question (use this seed for variety: {unique_seed})
+- Do NOT repeat questions from this session"""
     
     try:
         chat = LlmChat(
