@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Share,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,12 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+const SUBJECT_CONFIG = {
+  math: { icon: 'calculator', color: '#FF6B6B', label: 'Math' },
+  phonics: { icon: 'book', color: '#4ECDC4', label: 'Phonics' },
+  gk: { icon: 'earth', color: '#6BCB77', label: 'General Knowledge' },
+};
 
 interface Session {
   session_id: string;
@@ -80,7 +87,7 @@ export default function DashboardScreen() {
   };
 
   const startNewSession = () => {
-    router.push('/learn');
+    router.push('/subjects');
   };
 
   if (loading) {
@@ -106,11 +113,32 @@ export default function DashboardScreen() {
   const phonicsProgress = child.subjects_progress?.phonics || { level: 1, questions_answered: 0, accuracy: 0 };
   const gkProgress = child.subjects_progress?.gk || { level: 1, questions_answered: 0, accuracy: 0 };
   
+  // Calculate total questions across all subjects
+  const totalQuestions = mathProgress.questions_answered + phonicsProgress.questions_answered + gkProgress.questions_answered;
+  
   const subjects = [
     { id: 'math', name: 'Math', icon: 'calculator', color: '#FF6B6B', progress: mathProgress },
     { id: 'phonics', name: 'Phonics', icon: 'book', color: '#4ECDC4', progress: phonicsProgress },
     { id: 'gk', name: 'General Knowledge', icon: 'earth', color: '#6BCB77', progress: gkProgress },
   ];
+
+  const shareProgress = async () => {
+    const shareText = `🎉 ${child.name}'s Learning Update!
+
+⭐ ${child.total_stars} stars earned
+🔥 ${child.streak?.current || 0} day streak
+📊 Math: Level ${mathProgress.level} | Phonics: Level ${phonicsProgress.level} | GK: Level ${gkProgress.level}
+
+Learning with KidLearn+ 🚀`;
+
+    try {
+      await Share.share({
+        message: shareText,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -135,6 +163,20 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* Streak Card */}
+        <View style={styles.streakCard}>
+          <Text style={styles.fireEmoji}>🔥</Text>
+          <View style={styles.streakInfo}>
+            <View style={styles.streakMain}>
+              <Text style={styles.streakNumber}>{child.streak?.current || 0}</Text>
+              <Text style={styles.streakLabel}>day streak</Text>
+            </View>
+            <Text style={styles.longestStreak}>
+              Longest: {child.streak?.longest || 0} days
+            </Text>
+          </View>
+        </View>
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
@@ -145,20 +187,22 @@ export default function DashboardScreen() {
 
           <View style={styles.statCard}>
             <Ionicons name="help-circle" size={32} color="#FF6B6B" />
-            <Text style={styles.statValue}>{mathProgress.questions_answered}</Text>
+            <Text style={styles.statValue}>{totalQuestions}</Text>
             <Text style={styles.statLabel}>Questions</Text>
           </View>
 
           <View style={styles.statCard}>
             <Ionicons name="trophy" size={32} color="#FFD93D" />
-            <Text style={styles.statValue}>{mathProgress.accuracy}%</Text>
-            <Text style={styles.statLabel}>Accuracy</Text>
+            <Text style={styles.statValue}>
+              {Math.round((mathProgress.accuracy + phonicsProgress.accuracy + gkProgress.accuracy) / 3)}%
+            </Text>
+            <Text style={styles.statLabel}>Avg Accuracy</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Ionicons name="trending-up" size={32} color="#6BCB77" />
-            <Text style={styles.statValue}>Level {mathProgress.level}</Text>
-            <Text style={styles.statLabel}>Difficulty</Text>
+            <Ionicons name="star" size={32} color="#FFD93D" />
+            <Text style={styles.statValue}>{child.total_stars}</Text>
+            <Text style={styles.statLabel}>Total Stars</Text>
           </View>
         </View>
 
@@ -290,6 +334,12 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
+      {/* WhatsApp Share Button */}
+      <TouchableOpacity style={styles.shareButton} onPress={shareProgress}>
+        <Ionicons name="share-social" size={24} color="#25D366" />
+        <Text style={styles.shareButtonText}>Share Progress on WhatsApp</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.continueButton} onPress={startNewSession}>
         <Text style={styles.continueButtonText}>Continue Learning</Text>
         <Ionicons name="arrow-forward" size={20} color="#fff" />
@@ -368,6 +418,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 8,
+  streakCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  fireEmoji: {
+    fontSize: 64,
+    marginRight: 20,
+  },
+  streakInfo: {
+    flex: 1,
+  },
+  streakMain: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginBottom: 4,
+  },
+  streakNumber: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FF6B6B',
+  },
+  streakLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  longestStreak: {
+    fontSize: 14,
+    color: '#999',
+  },
+
   },
   statsGrid: {
     flexDirection: 'row',
@@ -525,6 +617,25 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: '#25D366',
+  },
+  shareButtonText: {
+    color: '#25D366',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
   continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
