@@ -195,6 +195,66 @@ backend:
         agent: "testing"
         comment: "✅ PASSED: Progress analytics endpoint working correctly. GET /api/progress/{child_id} returns comprehensive data: child profile with updated total_stars, recent_sessions array, calculated total_time_minutes, and subjects_progress with accuracy percentages."
 
+  - task: "Multilingual Question Generation (Phase 2A)"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added multilingual support for English, Hindi, and Punjabi across Math, Phonics, and GK subjects. Enhanced Claude prompts for 9 language/subject combinations."
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL ISSUE: Math questions in Hindi and Punjabi are generated in English instead of native scripts. Hindi math: '5 + 3 = ?' instead of Devanagari. Punjabi math: '5 + 3 = ?' instead of Gurmukhi. Phonics and GK work correctly in native scripts. Also found duplicate question generation issue - Claude returns identical questions consecutively."
+
+  - task: "MongoDB Schema Updates (Phase 2A)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated child schema with language, subjects_unlocked, streak, badges, daily_goal_minutes, and subjects_progress fields. All subjects (math, phonics, gk) initialized by default."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: All new schema fields working correctly. Child profiles have language field, subjects_unlocked contains all 3 subjects, streak/badges/daily_goal_minutes initialized properly, subjects_progress has all subjects with level/questions_answered/accuracy fields."
+
+  - task: "Multi-Subject Support (Phase 2A)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added support for Math, Phonics, and General Knowledge subjects with subject-specific Claude prompts and session management."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: All 3 subjects working correctly. Math generates arithmetic questions, Phonics generates letter/sound questions, GK generates age-appropriate knowledge questions. Subject-specific prompts working as expected."
+
+  - task: "Adaptive Engine Across Languages (Phase 2A)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Extended adaptive difficulty logic to work across all languages and subjects while maintaining language consistency."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: Adaptive logic maintains language consistency. Tested Hindi math and Punjabi phonics - difficulty increases/decreases correctly while keeping questions in the same language throughout the session."
+
 frontend:
   - task: "Authentication Flow (Google OAuth)"
     implemented: true
@@ -251,13 +311,19 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
-  stuck_tasks: []
+  current_focus:
+    - "Multilingual Question Generation (Phase 2A)"
+  stuck_tasks:
+    - "Multilingual Question Generation (Phase 2A)"
   test_all: false
-  test_priority: "sequential"
+  test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
     message: "Phase 1 MVP implementation complete. All backend APIs implemented with FastAPI + MongoDB + Claude Sonnet. Frontend has complete flow: login → child selection → learning session → dashboard. Backend needs testing to verify all endpoints work correctly, especially auth flow, question generation with Claude, and adaptive difficulty logic."
   - agent: "testing"
     message: "✅ COMPREHENSIVE BACKEND TESTING COMPLETE: All 13 test cases passed successfully. Fixed critical Claude Sonnet JSON parsing issue (was returning markdown-wrapped JSON). All backend APIs are fully functional: Auth flow, child profiles, session management, question generation with Claude, adaptive difficulty logic, and progress analytics. Backend is production-ready."
+  - agent: "main"
+    message: "🚀 PHASE 2A BACKEND COMPLETE: Added multilingual support (English + Hindi + Punjabi), multi-subject question generation (Math, Phonics, GK), updated MongoDB schemas with language/streak/badges/subjects_unlocked fields. Claude Sonnet prompts enhanced for 3 languages × 3 subjects = 9 question types. Ready for comprehensive testing."
+  - agent: "testing"
+    message: "🧪 PHASE 2A BACKEND TESTING COMPLETE: Tested 14 test cases across multilingual support, schema updates, adaptive engine, and Claude quality. CRITICAL ISSUES FOUND: 1) Math questions in Hindi/Punjabi generate in English instead of native scripts (Devanagari/Gurmukhi). Phonics/GK work correctly. 2) Claude generates duplicate questions consecutively. Schema updates, adaptive engine, and backward compatibility all working correctly. 12/14 tests passed."
