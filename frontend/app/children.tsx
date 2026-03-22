@@ -88,7 +88,7 @@ export default function ChildrenScreen() {
 
   const selectChild = async (childId: string) => {
     await AsyncStorage.setItem('current_child_id', childId);
-    router.push('/learn');
+    router.push('/subjects');
   };
 
   if (loading) {

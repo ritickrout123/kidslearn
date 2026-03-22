@@ -100,11 +100,17 @@ export default function DashboardScreen() {
   }
 
   const { child, recent_sessions, total_time_minutes } = progressData;
-  const mathProgress = child.subjects_progress?.math || {
-    level: 1,
-    questions_answered: 0,
-    accuracy: 0,
-  };
+  
+  // Get all subject progress data
+  const mathProgress = child.subjects_progress?.math || { level: 1, questions_answered: 0, accuracy: 0 };
+  const phonicsProgress = child.subjects_progress?.phonics || { level: 1, questions_answered: 0, accuracy: 0 };
+  const gkProgress = child.subjects_progress?.gk || { level: 1, questions_answered: 0, accuracy: 0 };
+  
+  const subjects = [
+    { id: 'math', name: 'Math', icon: 'calculator', color: '#FF6B6B', progress: mathProgress },
+    { id: 'phonics', name: 'Phonics', icon: 'book', color: '#4ECDC4', progress: phonicsProgress },
+    { id: 'gk', name: 'General Knowledge', icon: 'earth', color: '#6BCB77', progress: gkProgress },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -159,26 +165,31 @@ export default function DashboardScreen() {
         {/* Subject Progress */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Subject Progress</Text>
-          <View style={styles.subjectCard}>
-            <View style={styles.subjectHeader}>
-              <View style={styles.subjectInfo}>
-                <Ionicons name="calculator" size={24} color="#FF6B6B" />
-                <Text style={styles.subjectName}>Math</Text>
+          {subjects.map((subject) => (
+            <View key={subject.id} style={[styles.subjectCard, { marginBottom: 12 }]}>
+              <View style={styles.subjectHeader}>
+                <View style={styles.subjectInfo}>
+                  <Ionicons name={subject.icon as any} size={24} color={subject.color} />
+                  <Text style={styles.subjectName}>{subject.name}</Text>
+                </View>
+                <Text style={styles.subjectLevel}>Level {subject.progress.level}</Text>
               </View>
-              <Text style={styles.subjectLevel}>Level {mathProgress.level}</Text>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { 
+                      width: `${(subject.progress.level / 3) * 100}%`,
+                      backgroundColor: subject.color
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {subject.progress.questions_answered} questions answered • {subject.progress.accuracy}% accuracy
+              </Text>
             </View>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${(mathProgress.level / 3) * 100}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {mathProgress.questions_answered} questions answered
-            </Text>
-          </View>
+          ))}
         </View>
 
         {/* Recent Sessions */}
@@ -232,29 +243,40 @@ export default function DashboardScreen() {
         {/* Insights */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Insights</Text>
+          
+          {/* Overall Performance */}
           <View style={styles.insightCard}>
-            {mathProgress.accuracy >= 80 ? (
-              <>
-                <Ionicons name="trophy" size={32} color="#6BCB77" />
-                <Text style={styles.insightText}>
-                  🎉 Excellent work! {child.name} is doing great with {mathProgress.accuracy}% accuracy!
-                </Text>
-              </>
-            ) : mathProgress.accuracy >= 60 ? (
-              <>
-                <Ionicons name="thumbs-up" size={32} color="#4ECDC4" />
-                <Text style={styles.insightText}>
-                  😊 Good progress! Keep practicing to improve accuracy.
-                </Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="bulb" size={32} color="#FFD93D" />
-                <Text style={styles.insightText}>
-                  💪 Keep going! Every question helps {child.name} learn and grow.
-                </Text>
-              </>
-            )}
+            {(() => {
+              const avgAccuracy = (mathProgress.accuracy + phonicsProgress.accuracy + gkProgress.accuracy) / 3;
+              if (avgAccuracy >= 80) {
+                return (
+                  <>
+                    <Ionicons name="trophy" size={32} color="#6BCB77" />
+                    <Text style={styles.insightText}>
+                      🎉 Excellent work! {child.name} is doing great with {Math.round(avgAccuracy)}% overall accuracy!
+                    </Text>
+                  </>
+                );
+              } else if (avgAccuracy >= 60) {
+                return (
+                  <>
+                    <Ionicons name="thumbs-up" size={32} color="#4ECDC4" />
+                    <Text style={styles.insightText}>
+                      😊 Good progress! Keep practicing to improve accuracy.
+                    </Text>
+                  </>
+                );
+              } else {
+                return (
+                  <>
+                    <Ionicons name="bulb" size={32} color="#FFD93D" />
+                    <Text style={styles.insightText}>
+                      💪 Keep going! Every question helps {child.name} learn and grow.
+                    </Text>
+                  </>
+                );
+              }
+            })()}
           </View>
 
           <View style={styles.insightCard}>

@@ -54,6 +54,7 @@ export default function LearnScreen() {
     try {
       const childId = await AsyncStorage.getItem('current_child_id');
       const sessionToken = await AsyncStorage.getItem('session_token');
+      const currentSubject = await AsyncStorage.getItem('current_subject') || 'math';
 
       if (!childId) {
         router.replace('/children');
@@ -69,14 +70,14 @@ export default function LearnScreen() {
 
       // Start session
       const sessionResponse = await axios.post(
-        `${BACKEND_URL}/api/session/start?child_id=${childId}&subject=math`,
+        `${BACKEND_URL}/api/session/start?child_id=${childId}&subject=${currentSubject}`,
         {},
         { headers: { Authorization: `Bearer ${sessionToken}` } }
       );
       setSessionId(sessionResponse.data.session_id);
 
       // Get first question
-      await generateQuestion(childId, sessionResponse.data.difficulty);
+      await generateQuestion(childId, sessionResponse.data.difficulty, currentSubject, childResponse.data.language || 'en');
     } catch (error) {
       console.error('Failed to initialize session:', error);
       router.replace('/children');
@@ -85,14 +86,18 @@ export default function LearnScreen() {
     }
   };
 
-  const generateQuestion = async (childId: string, difficulty: number) => {
+  const generateQuestion = async (childId: string, difficulty: number, subject?: string, language?: string) => {
     try {
       const sessionToken = await AsyncStorage.getItem('session_token');
+      const currentSubject = subject || await AsyncStorage.getItem('current_subject') || 'math';
+      const currentLanguage = language || 'en';
+      
       const response = await axios.post(
         `${BACKEND_URL}/api/question/generate`,
         {
           child_id: childId,
-          subject: 'math',
+          subject: currentSubject,
+          language: currentLanguage,
           difficulty: difficulty,
         },
         { headers: { Authorization: `Bearer ${sessionToken}` } }
@@ -150,8 +155,10 @@ export default function LearnScreen() {
 
     if (feedbackData) {
       const childId = await AsyncStorage.getItem('current_child_id');
+      const currentSubject = await AsyncStorage.getItem('current_subject') || 'math';
+      const language = childData?.language || 'en';
       if (childId) {
-        await generateQuestion(childId, feedbackData.new_difficulty);
+        await generateQuestion(childId, feedbackData.new_difficulty, currentSubject, language);
       }
     }
   };
